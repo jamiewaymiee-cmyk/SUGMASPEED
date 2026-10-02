@@ -1,0 +1,102 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+
+local localPlayer = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local toggled = false
+local currentSpeed = 5
+local speedStep = 5
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ConventionalTPWalkGui"
+local success = pcall(function()
+    screenGui.Parent = CoreGui
+end)
+if not success then
+    screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+end
+
+local textLabel = Instance.new("TextLabel")
+textLabel.Name = "StatusLabel"
+textLabel.Size = UDim2.new(0, 220, 0, 50)
+textLabel.Position = UDim2.new(1, -230, 0, 10)
+textLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+textLabel.BackgroundTransparency = 0.4
+textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+textLabel.TextSize = 14
+textLabel.Font = Enum.Font.Code
+textLabel.TextXAlignment = Enum.TextXAlignment.Center
+textLabel.TextYAlignment = Enum.TextYAlignment.Center
+textLabel.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 8)
+uiCorner.Parent = textLabel
+
+local function updateUI()
+    local statusColor = toggled and "<b><font color='#00FF00'>ON</font></b>" or "<b><font color='#FF0000'>OFF</font></b>"
+    textLabel.RichText = true
+    textLabel.Text = string.format("TPWalk: %s\nSpeed: %d studs/s\n[P] Toggle | [-/+] Adjust", statusColor, currentSpeed)
+end
+
+updateUI()
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.P then
+        toggled = not toggled
+        updateUI()
+    elseif input.KeyCode == Enum.KeyCode.Minus or input.KeyCode == Enum.KeyCode.KeypadMinus then
+        currentSpeed = math.max(5, currentSpeed - speedStep)
+        updateUI()
+    elseif input.KeyCode == Enum.KeyCode.Equals or input.KeyCode == Enum.KeyCode.KeypadPlus then
+        currentSpeed = currentSpeed + speedStep
+        updateUI()
+    end
+end)
+
+RunService.RenderStepped:Connect(function(dt)
+    if not toggled then return end
+    
+    local character = localPlayer.Character
+    if not character then return end
+    
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoidRootPart or not humanoid or humanoid.Health <= 0 then return end
+
+    local lookVector = camera.CFrame.LookVector
+    local rightVector = camera.CFrame.RightVector
+    
+    lookVector = Vector3.new(lookVector.X, 0, lookVector.Z).Unit
+    rightVector = Vector3.new(rightVector.X, 0, rightVector.Z).Unit
+    
+    local moveDirection = Vector3.zero
+    
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+        moveDirection = moveDirection + lookVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
+        moveDirection = moveDirection - lookVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then
+        moveDirection = moveDirection + rightVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+        moveDirection = moveDirection - rightVector
+    end
+
+    if moveDirection.Magnitude > 0 then
+        moveDirection = moveDirection.Unit
+        local travelDistance = currentSpeed * dt
+        
+        local currentCFrame = humanoidRootPart.CFrame
+        local newPosition = currentCFrame.Position + (moveDirection * travelDistance)
+        
+        humanoidRootPart.CFrame = CFrame.new(newPosition, newPosition + currentCFrame.LookVector)
+    end
+end)
